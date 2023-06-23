@@ -66,6 +66,16 @@ app.get("/ques-fetch", function (req, resp) {
     })
 })
 
+app.get("/ques-del", function (req, resp) {
+    var data = req.query.question;
+    dbcon.query("delete from quesBank where question=?", data, function (err, res) {
+        if (err)
+            resp.send(err.message);
+        else
+            resp.send(res.affectedRows + "Record Deleted");
+    })
+})
+
 app.get("/searchDifficulty-in-table", function (req, resp) {
     //resp.send("Tada"+ req.query.id);
     dbcon.query("select * from quesBank where difficulty=?",req.query.id, function (err, result) {
