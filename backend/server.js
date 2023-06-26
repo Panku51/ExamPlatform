@@ -21,7 +21,7 @@ var dbConfig = {
     user: "root",
     password: '',
     database: "TestCreation",
-    port :'3309'
+    port: '3309'
 }
 //to check that connected or not
 var dbcon = sql.createConnection(dbConfig);
@@ -33,18 +33,18 @@ dbcon.connect(function (err, req, resp) {
 })
 
 app.get("/", function (req, resp) {
-    var filepath = path.join(path.resolve(), "public","index.html");
+    var filepath = path.join(path.resolve(), "public", "index.html");
     resp.sendFile(filepath);
 })
 
-app.post("/ques",function (req, resp){
-    var filepath = path.join(path.resolve(), "public","Ques.html");
+app.post("/ques", function (req, resp) {
+    var filepath = path.join(path.resolve(), "public", "Ques.html");
     resp.sendFile(filepath);
 })
 
-app.post("/create-ques",function(req,resp){
+app.post("/create-ques", function (req, resp) {
     var data = [req.body.question, req.body.category, req.body.difficulty];
-    dbcon.query("insert into quesBank values(?,?,?)", data, function (err,result) {
+    dbcon.query("insert into quesBank (question, category, difficulty) values(?,?,?)", data, function (err, result) {
         if (err)
             resp.send(err.message);
         else
@@ -52,8 +52,8 @@ app.post("/create-ques",function(req,resp){
     })
 })
 
-app.post("/showQues", function(req,resp){
-    var filepath = path.join(path.resolve(), "public","showQues.html");
+app.post("/showQues", function (req, resp) {
+    var filepath = path.join(path.resolve(), "public", "showQues.html");
     resp.sendFile(filepath);
 })
 
@@ -66,9 +66,9 @@ app.get("/ques-fetch", function (req, resp) {
     })
 })
 
-app.get("/ques-del", function (req, resp) {
-    var data = req.query.question;
-    dbcon.query("delete from quesBank where question=?", data, function (err, res) {
+app.get("/ques-del/:id", function (req, resp) {
+    var data = req.params.id;
+    dbcon.query("delete from quesBank where id=?", data, function (err, res) {
         if (err)
             resp.send(err.message);
         else
@@ -76,13 +76,64 @@ app.get("/ques-del", function (req, resp) {
     })
 })
 
+app.post('/ques-update/:id', (req, res) => {
+    const id = req.params.id;
+    console.log(id);
+    const { question, category, difficulty } = req.body;
+
+    const updateQuery = 'UPDATE quesBank SET question = ?, category = ?, difficulty = ? WHERE id = ?';
+    dbcon.query(updateQuery, [question, category, difficulty, id], (err, result) => {
+        if (err) {
+            console.error('Error updating question in database:', err);
+            res.sendStatus(500);
+            return;
+        }
+        console.log('Question updated in the database');
+        res.sendStatus(200);
+    });
+});
+
+app.post("/create-test", (req, res) => {
+    const { testName, selectedQuestions } = req.body;
+    if (!selectedQuestions || !Array.isArray(selectedQuestions)) {
+        res.status(400).send('Invalid or missing questions array');
+        return;
+    }
+
+    const insertTestQuery = 'INSERT INTO tests (test_name) VALUES (?)';
+
+    dbcon.query(insertTestQuery, [testName], (err, result) => {
+        if (err) {
+            console.error('Error inserting test into tests table:', err);
+            res.sendStatus(500);
+            return;
+        }
+
+        const testId = result.insertId;
+
+        const testQuestionData = selectedQuestions.map(questionId => [testId, testName, questionId]);
+        console.log(testQuestionData);
+
+
+        dbcon.query('INSERT INTO test_questions (test_id, test_name, question_id) VALUES ?', [testQuestionData], function (err, result) {
+            if (err) {
+                console.error('Error saving test questions:', err);
+                res.sendStatus(500);
+                return;
+            }
+            console.log('Test created and questions saved successfully');
+            res.sendStatus(200);
+        });
+    });
+});
+
 app.get("/searchDifficulty-in-table", function (req, resp) {
     //resp.send("Tada"+ req.query.id);
-    dbcon.query("select * from quesBank where difficulty=?",req.query.id, function (err, result) {
+    dbcon.query("select * from quesBank where difficulty=?", req.query.id, function (err, result) {
         if (err)
             resp.send(err.message);
         else
-        console.log('Found ' + result.length + ' questions with difficulty level ' + req.query.id);
+            console.log('Found ' + result.length + ' questions with difficulty level ' + req.query.id);
         console.log(result);
         resp.send(result);
     })
@@ -90,13 +141,14 @@ app.get("/searchDifficulty-in-table", function (req, resp) {
 
 app.get("/searchCategory-in-table", function (req, resp) {
     //resp.send("Tada"+ req.query.id);
-    dbcon.query("select * from quesBank where category=?",req.query.id, function (err, result) {
+    dbcon.query("select * from quesBank where category=?", req.query.id, function (err, result) {
         if (err)
             resp.send(err.message);
         else
-        console.log('Found ' + result.length + ' questions with category ' + req.query.id);
+            console.log('Found ' + result.length + ' questions with category ' + req.query.id);
         console.log(result);
         resp.send(result);
     })
 })
+
 
