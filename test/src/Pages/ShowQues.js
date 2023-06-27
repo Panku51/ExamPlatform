@@ -90,11 +90,14 @@ const ShowQues = () => {
             {QuesList.map((val, index) => (
               <tr key={index}>
                 <td>
-                <input
-                    type="checkbox"
-                    checked={selectedQuestions.includes(val.id)}
-                    onChange={(e) => handleCheckboxChange(e, val.id)}
-                  />
+                  <center>
+                    <input
+                      className='checkbox'
+                      type="checkbox"
+                      checked={selectedQuestions.includes(val.id)}
+                      onChange={(e) => handleCheckboxChange(e, val.id)}
+                    />
+                  </center>
                 </td>
                 <td>
                   <input
@@ -114,25 +117,30 @@ const ShowQues = () => {
                   onChange={(e) => updateQuestionValue(index, 'difficulty', e.target.value)}
                 /></td>
                 <td>
-                  <button className='heading' onClick={() => updateQues(val.id)}>Update</button>
+                  <center>
+                    <button className='heading' onClick={() => updateQues(val.id)}>Update</button>
+                  </center>
                 </td>
                 <td>
-                  <button className='heading' onClick={() => remove(val.id)}>Delete</button>
+                  <center>
+                    <button className='heading' onClick={() => remove(val.id)}>Delete</button>
+                  </center>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
         <div>
-        <input type="text" id="testName" value={testName} onChange={handleTestNameChange} />
-        <button
-          className="heading"
-          onClick={handleTestCreation}
-          disabled={selectedQuestions.length === 0}
-        >
-          Create Test
-        </button>
-      </div>
+          <label>Test Name</label>
+          <input type="text" id="testName" value={testName} onChange={handleTestNameChange} />
+          <button
+            className="heading"
+            onClick={handleTestCreation}
+            disabled={selectedQuestions.length === 0}
+          >
+            Create Test
+          </button>
+        </div>
 
       </div>
     </>

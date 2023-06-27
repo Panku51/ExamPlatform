@@ -9,7 +9,7 @@ const cors = require('cors');
 app.use(express.static("public"));
 app.use(cors());
 app.use(express.json())
-app.use(express.urlencoded({ extended: true }));// for the conversion of binary to json,otherwise it will show undefined.
+app.use(express.urlencoded({ extended: true }));
 
 const port = 5181;
 app.listen(port, function () {
@@ -32,16 +32,6 @@ dbcon.connect(function (err, req, resp) {
         console.log("Tada");
 })
 
-app.get("/", function (req, resp) {
-    var filepath = path.join(path.resolve(), "public", "index.html");
-    resp.sendFile(filepath);
-})
-
-app.post("/ques", function (req, resp) {
-    var filepath = path.join(path.resolve(), "public", "Ques.html");
-    resp.sendFile(filepath);
-})
-
 app.post("/create-ques", function (req, resp) {
     var data = [req.body.question, req.body.category, req.body.difficulty];
     dbcon.query("insert into quesBank (question, category, difficulty) values(?,?,?)", data, function (err, result) {
@@ -50,11 +40,6 @@ app.post("/create-ques", function (req, resp) {
         else
             resp.send("success");
     })
-})
-
-app.post("/showQues", function (req, resp) {
-    var filepath = path.join(path.resolve(), "public", "showQues.html");
-    resp.sendFile(filepath);
 })
 
 app.get("/ques-fetch", function (req, resp) {
@@ -112,8 +97,7 @@ app.post("/create-test", (req, res) => {
         const testId = result.insertId;
 
         const testQuestionData = selectedQuestions.map(questionId => [testId, testName, questionId]);
-        console.log(testQuestionData);
-
+        // console.log(testQuestionData);
 
         dbcon.query('INSERT INTO test_questions (test_id, test_name, question_id) VALUES ?', [testQuestionData], function (err, result) {
             if (err) {
@@ -151,4 +135,55 @@ app.get("/searchCategory-in-table", function (req, resp) {
     })
 })
 
+//---------------------- ADMIN MODULE---------------------------
 
+app.get("/test-fetch", function (req, resp) {
+    const query = 'SELECT test_name FROM tests';
+
+    dbcon.query(query, (error, results) => {
+        if (error) {
+            console.error('Error fetching test names:', error);
+            resp.status(500).json({ error: 'Error fetching test names' });
+        } else {
+            const testNames = results.map((row) => row.test_name);
+            // console.log(testNames);
+            resp.send({ testNames });
+        }
+    });
+})
+
+app.post('/create-bundle', (req, res) => {
+    const { bundleName, bundleDescription } = req.body;
+
+    dbcon.query(
+        'INSERT INTO bundles (bundle_name, bundle_description) VALUES (?, ?)',
+        [bundleName, bundleDescription],
+        (error, results) => {
+            if (error) {
+                console.error('Error creating bundle:', error);
+                return res.status(500).json({ message: 'Failed to create bundle' });
+            }
+
+            const bundleId = results.insertId;
+            res.json({ bundleId });
+        }
+    );
+});
+
+app.post('/create-bundle-items', (req, res) => {
+    const { bundleId, selectedTests } = req.body;
+    const bundleItemsData = selectedTests.map((testId) => [bundleId, 'test', testId]);
+
+    dbcon.query(
+        'INSERT INTO bundleItems (bundle_id, item_type, item_id) VALUES ?',
+        [bundleItemsData],
+        (error) => {
+            if (error) {
+                console.error('Error creating bundle items:', error);
+                return res.status(500).json({ message: 'Failed to create bundle items' });
+            }
+
+            res.json({ message: 'Bundle items created successfully' });
+        }
+    );
+});
