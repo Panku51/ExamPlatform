@@ -5,31 +5,37 @@ var path = require("path");
 var app = express();
 var sql = require("mysql");
 const cors = require('cors');
+require('dotenv').config();
+const fs = require('fs');
+// Library for the document read
+const mammoth = require('mammoth');
+const { promisify } = require('util');
+
+const readFileAsync = promisify(fs.readFile);
 
 app.use(express.static("public"));
 app.use(cors());
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }));
 
-const port = 5181;
-app.listen(port, function () {
-    console.log("server started on port", port);
+app.listen(process.env.PORT, function () {
+    console.log("server started on port", process.env.PORT);
 })
 
 var dbConfig = {
-    host: "localhost",
-    user: "root",
-    password: '',
-    database: "TestCreation",
-    port: '3309'
+    host: process.env.host,
+    user: process.env.user,
+    password: process.env.password,
+    database: process.env.database,
+    port: process.env.port
 }
 //to check that connected or not
 var dbcon = sql.createConnection(dbConfig);
 dbcon.connect(function (err, req, resp) {
     if (err)
-        console.log("Nada ", err);
+        console.log("Error : ", err);
     else
-        console.log("Tada");
+        console.log("Database Successfully Connected");
 })
 
 app.post("/create-ques", function (req, resp) {
@@ -186,4 +192,102 @@ app.post('/create-bundle-items', (req, res) => {
             res.json({ message: 'Bundle items created successfully' });
         }
     );
+});
+//-----------------------------------FILE READ AND UPLOAD DATA IN DATABASE--------------------------------------
+async function readDocxFile(filePath) {
+    try {
+        const content = await readFileAsync(filePath, 'binary');
+        const result = await mammoth.extractRawText({ buffer: content });
+        const extractedText = result.value.trim();
+
+        return extractedText;
+    } catch (error) {
+        console.error('Error reading DOCX file:', error);
+        throw error;
+    }
+}
+
+function parseQuestionsAndOptions(extractedText) {
+    const regex = /Question: (.*) Options: (.*) Answer:(.*) Solution: (.*) Subject:(.*) Topic:(.*) Sub-Topic:(.*)/gm;
+    let match;
+    const questions = [];
+
+    while ((match = regex.exec(extractedText))) {
+        const question = match[1].trim();
+        const options = match[2].trim().split(',').map((option) => option.trim());
+        const answer = match[3].trim();
+        const solution = match[4].trim();
+        const subject = match[5].trim();
+        const topic = match[6].trim();
+        const subTopic = match[7].trim();
+
+        questions.push({ question, options, answer, solution,subject,topic,subTopic });
+    }
+
+    return questions;
+}
+
+async function insertQuestionsAndOptions(questions) {
+    const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS Ques (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        question TEXT,
+        ${questions[0].options
+            .map((_, index) => `option_${index + 1} TEXT`)
+            .join(', ')}
+        ,
+        answer TEXT,
+        solution TEXT,
+        subject TEXT,
+        topic TEXT,
+        subTopic TEXT
+      )
+    `;
+
+    await new Promise((resolve, reject) => {
+        dbcon.query(createTableQuery, (error) => {
+            if (error) {
+                console.error('Error creating table:', error);
+                reject(error);
+                return;
+            }
+            console.log('Table created successfully!');
+            resolve();
+        });
+    });
+
+    const insertQuery = `
+      INSERT INTO Ques (question, ${questions[0].options
+            .map((_, index) => `option_${index + 1}`,)
+            .join(', ')}, answer, solution, subject, topic, subTopic)
+      VALUES ${questions
+            .map(
+                ({ question, options, answer , solution, subject, topic, subTopic }) =>
+                    `('${question}', '${options.join("', '")}' , '${answer}', '${solution}', '${subject}','${topic}','${subTopic}')`
+            )
+            .join(', ')}
+        
+    `;
+
+    await new Promise((resolve, reject) => {
+        dbcon.query(insertQuery, (error) => {
+            if (error) {
+                console.error('Error inserting data into the database:', error);
+                reject(error);
+                return;
+            }
+            console.log('Data inserted successfully!');
+            resolve();
+        });
+    });
+}
+
+readDocxFile('sample.docx')
+    .then((extractedText) => {
+        const questions = parseQuestionsAndOptions(extractedText);
+        console.log('Questions:', questions);
+        insertQuestionsAndOptions(questions);
+    })
+    .catch((error) => {
+        console.error('Error:', error);
 });

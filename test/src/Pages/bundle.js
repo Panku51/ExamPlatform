@@ -31,20 +31,17 @@ const Bundle = () => {
 
   const handleCreateBundle = async () => {
     try {
-      // Create the bundle in the 'bundles' table
       const bundleResponse = await Axios.post('http://localhost:5181/create-bundle', {
         bundleName,
         bundleDescription,
       });
       const bundleId = bundleResponse.data.bundleId;
 
-      // Insert selected tests into the 'bundleItems' table
       await Axios.post('http://localhost:5181/create-bundle-items', {
         bundleId,
         selectedTests,
       });
 
-      // Reset the form
       setBundleName('');
       setBundleDescription('');
       setSelectedTests([]);
