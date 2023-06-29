@@ -1,6 +1,7 @@
 const { response } = require("express");
 var express = require("express");
 const { url } = require("inspector");
+const multer = require('multer');
 var path = require("path");
 var app = express();
 var sql = require("mysql");
@@ -141,7 +142,7 @@ app.get("/searchCategory-in-table", function (req, resp) {
     })
 })
 
-//---------------------- ADMIN MODULE---------------------------
+//---------------------- ADMIN MODULE ---------------------------
 
 app.get("/test-fetch", function (req, resp) {
     const query = 'SELECT test_name FROM tests';
@@ -194,18 +195,58 @@ app.post('/create-bundle-items', (req, res) => {
     );
 });
 //-----------------------------------FILE READ AND UPLOAD DATA IN DATABASE--------------------------------------
+
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.originalname);
+    },
+});
+
+const upload = multer({ storage });
+
+app.post('/upload-file', upload.single('formFile'), function (req, res) {
+    if (!req.file) {
+        res.status(400).send('No file uploaded.');
+        return;
+    }
+
+    const filename = req.file.filename;
+    const filepath = req.file.path;
+
+    dbcon.query('INSERT INTO files (filename) VALUES (?)', [filename], function (err, result) {
+        if (err) {
+            console.error('Error inserting filename into database:', err);
+            res.status(500).send('Error inserting filename into database');
+        } else {
+            console.log('File uploaded successfully and inserted into the database');
+            res.send('success');
+            readDocxFile(filepath);
+        }
+    });
+});
+
 async function readDocxFile(filePath) {
     try {
-        const content = await readFileAsync(filePath, 'binary');
+        const content = await readFileAsync(filePath);
         const result = await mammoth.extractRawText({ buffer: content });
         const extractedText = result.value.trim();
 
-        return extractedText;
+        const questions = parseQuestionsAndOptions(extractedText);
+        console.log('Questions:', questions);
+        insertQuestionsAndOptions(questions);
     } catch (error) {
         console.error('Error reading DOCX file:', error);
-        throw error;
     }
 }
+
 
 function parseQuestionsAndOptions(extractedText) {
     const regex = /Question: (.*) Options: (.*) Answer:(.*) Solution: (.*) Subject:(.*) Topic:(.*) Sub-Topic:(.*)/gm;
@@ -221,7 +262,7 @@ function parseQuestionsAndOptions(extractedText) {
         const topic = match[6].trim();
         const subTopic = match[7].trim();
 
-        questions.push({ question, options, answer, solution,subject,topic,subTopic });
+        questions.push({ question, options, answer, solution, subject, topic, subTopic });
     }
 
     return questions;
@@ -266,7 +307,6 @@ async function insertQuestionsAndOptions(questions) {
                     `('${question}', '${options.join("', '")}' , '${answer}', '${solution}', '${subject}','${topic}','${subTopic}')`
             )
             .join(', ')}
-        
     `;
 
     await new Promise((resolve, reject) => {
@@ -277,17 +317,8 @@ async function insertQuestionsAndOptions(questions) {
                 return;
             }
             console.log('Data inserted successfully!');
+           // response.send("Data Inserted Successfully");
             resolve();
         });
     });
 }
-
-readDocxFile('sample.docx')
-    .then((extractedText) => {
-        const questions = parseQuestionsAndOptions(extractedText);
-        console.log('Questions:', questions);
-        insertQuestionsAndOptions(questions);
-    })
-    .catch((error) => {
-        console.error('Error:', error);
-});

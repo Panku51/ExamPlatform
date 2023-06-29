@@ -10,6 +10,7 @@ function CreateQues() {
     const [category, setCategory] = useState('')
     const [difficulty, setDifficulty] = useState('')
 
+
     const submit = () => {
         Axios.post('http://localhost:5181/create-ques', {
             question: question,
@@ -19,6 +20,31 @@ function CreateQues() {
             alert("successfully added");
         })
     }
+
+    const [selectedFile, setSelectedFile] = useState(null);
+
+    const handleFileChange = (event) => {
+        setSelectedFile(event.target.files[0]);
+    };
+
+    const handleFileUpload = () => {
+        if (!selectedFile) {
+            alert('Please select a file.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('formFile', selectedFile);
+
+        Axios.post('http://localhost:5181/upload-file', formData)
+            .then(() => {
+                alert('File uploaded successfully.');
+            })
+            .catch((error) => {
+                console.error('Error uploading file:', error);
+            });
+    };
+
 
     return (
         <div className="App">
@@ -54,7 +80,27 @@ function CreateQues() {
                     </div> <br></br>
                     <button type="submit" onClick={submit} value="Submit">Submit</button>
                 </div>
+                <div className='row'>
+                    <center><h3>OR  <hr></hr></h3></center>
+                    <center>
+                        <div className="col-10">
+                            <label htmlFor="formFile" className="form-label">
+                                <h1>Upload a file</h1>
+                            </label>
+                            <input
+                                className="form-control"
+                                type="file"
+                                id="formFile"
+                                name="formFile"
+                                onChange={handleFileChange}
+                            />
+                            <br />
+                            <button type="submit" onClick={handleFileUpload}>Submit File</button>
+                        </div>
+                    </center>
+                </div>
                 <div>
+                    <br></br>
                     {/* <button onClick={()=>{navigate("/Ques")}} className='heading'>Show Ques</button> */}
                     <center>
                         <Link to="/Ques"> <button className='heading'>Show Ques</button> </Link>
