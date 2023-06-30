@@ -9,10 +9,11 @@ const cors = require('cors');
 require('dotenv').config();
 const fs = require('fs');
 // Library for the document read
-const mammoth = require('mammoth');
 const { promisify } = require('util');
+const Docxtemplater = require('docxtemplater');
+const PizZip = require('pizzip');
+const MathJax = require('mathjax-node');
 
-const readFileAsync = promisify(fs.readFile);
 
 app.use(express.static("public"));
 app.use(cors());
@@ -57,6 +58,14 @@ app.get("/ques-fetch", function (req, resp) {
             resp.send(res);
     })
 })
+app.get("/fetchFromFile", function (req, resp) {
+    dbcon.query("select * from Ques", function (err, res) {
+        if (err)
+            resp.send(err);
+        else
+            resp.send(res);
+    })
+})
 
 app.get("/ques-del/:id", function (req, resp) {
     var data = req.params.id;
@@ -68,13 +77,39 @@ app.get("/ques-del/:id", function (req, resp) {
     })
 })
 
+app.get("/delFromFile/:id", function (req, resp) {
+    var data = req.params.id;
+    dbcon.query("delete from Ques where id=?", data, function (err, res) {
+        if (err)
+            resp.send(err.message);
+        else
+            resp.send(res.affectedRows + "Record Deleted");
+    })
+})
+// app.post('/ques-update/:id', (req, res) => {
+//     const id = req.params.id;
+//     console.log(id);
+//     const { question, category, difficulty } = req.body;
+
+//     const updateQuery = 'UPDATE quesBank SET question = ?, category = ?, difficulty = ? WHERE id = ?';
+//     dbcon.query(updateQuery, [question, category, difficulty, id], (err, result) => {
+//         if (err) {
+//             console.error('Error updating question in database:', err);
+//             res.sendStatus(500);
+//             return;
+//         }
+//         console.log('Question updated in the database');
+//         res.sendStatus(200);
+//     });
+// });
+
 app.post('/ques-update/:id', (req, res) => {
     const id = req.params.id;
     console.log(id);
-    const { question, category, difficulty } = req.body;
+    const { question, option_1,option_2,option_3,option_4,option_5,answer,solution,subject,topic,subTopic } = req.body;
 
-    const updateQuery = 'UPDATE quesBank SET question = ?, category = ?, difficulty = ? WHERE id = ?';
-    dbcon.query(updateQuery, [question, category, difficulty, id], (err, result) => {
+    const updateQuery = 'UPDATE Ques SET question = ?, option_1 = ?, option_2 = ?, option_3 = ?, option_4 =?, option_5=?,answer=?,solution=?,subject=?,topic=?,subTopic=? WHERE id = ?';
+    dbcon.query(updateQuery, [question,option_1,option_2,option_3,option_4,option_5,answer,solution,subject,topic,subTopic, id], (err, result) => {
         if (err) {
             console.error('Error updating question in database:', err);
             res.sendStatus(500);
@@ -233,18 +268,54 @@ app.post('/upload-file', upload.single('formFile'), function (req, res) {
     });
 });
 
-async function readDocxFile(filePath) {
-    try {
-        const content = await readFileAsync(filePath);
-        const result = await mammoth.extractRawText({ buffer: content });
-        const extractedText = result.value.trim();
 
-        const questions = parseQuestionsAndOptions(extractedText);
-        console.log('Questions:', questions);
-        insertQuestionsAndOptions(questions);
-    } catch (error) {
-        console.error('Error reading DOCX file:', error);
-    }
+// Configure MathJax
+MathJax.start();
+
+async function readDocxFile(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'binary');
+
+    const zip = new PizZip(content);
+
+    const doc = new Docxtemplater();
+    doc.loadZip(zip);
+
+    // Custom parser for expressions
+    doc.setOptions({
+      parser: function (tag) {
+        return {
+          get: tag === '.' ? function (s) { return s; } : compileExpression(tag),
+        };
+      },
+    });
+
+    doc.setData({});
+
+    doc.render();
+
+    const extractedText = doc.getFullText();
+
+    const questions = parseQuestionsAndOptions(extractedText);
+    console.log('Questions:', questions);
+    insertQuestionsAndOptions(questions);
+
+    return questions;
+  } catch (error) {
+    console.error('Error reading DOCX file:', error);
+    throw error;
+  }
+}
+
+function compileExpression(exp) {
+  return function (scope) {
+    const options = {
+      math: exp,
+    };
+
+    // Use MathJax to render the equation
+    return MathJax.typeset(options).then((data) => data.html);
+  };
 }
 
 
@@ -322,3 +393,4 @@ async function insertQuestionsAndOptions(questions) {
         });
     });
 }
+//--------------------------- 
